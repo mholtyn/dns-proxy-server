@@ -65,20 +65,26 @@ def encode_dns_name(labels: list[str]) -> bytes:
 
 def decode_dns_name(buf: bytes, start: int) -> tuple[list[str], int]:
     """
-    Odczytuje nazwę domeny z buf, od indeksu start (w formacie DNS: bajt długości,
-    potem tyle bajtów etykiety, ... aż bajt 0 = koniec).
-    Zwraca (lista etykiet jako list[str], indeks pierwszego bajtu ZA nazwą w buf).
-    start = indeks w buf, od którego zaczyna się ta nazwa (np. 12 dla pierwszej
-    question zaraz po 12-bajtowym headerze).
+    Odczytuje nazwę domeny z buf od start. Obsługuje kompresję: jeśli bajt
+    ma bity 11 (wskaźnik), skok pod 14-bitowy offset i odczyt reszty nazwy stamtąd.
+    Zwraca (lista etykiet, indeks bajtu ZA nazwą).
     """
     out: list[str] = []
     pos: int = start
     while True:
-        length_byte: int = buf[pos]  # 0 = end of name, else length of next label
+        length_byte = buf[pos]
         pos += 1
         if length_byte == 0:
             break
-        label: str = buf[pos : pos + length_byte].decode("ascii")
+        # sprawdzam dwa pierwsze bity bajtu, jesli to 11, to ten bajt 
+        # nie mowi o dlugosci labela tylko jest pointerem
+        if (length_byte & 0xC0) == 0xC0:
+            offset = ((length_byte & 0x3F) << 8) | buf[pos]
+            pos += 1
+            labels_tail, _ = decode_dns_name(buf, offset)
+            out.extend(labels_tail)
+            break
+        label = buf[pos : pos + length_byte].decode("ascii")
         out.append(label)
         pos += length_byte
     return (out, pos)

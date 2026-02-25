@@ -28,31 +28,35 @@ def main():
 
             # Request
             parsed_header, offset = parse_header(buf)
-            parsed_question, offset = parse_question(buf, offset)
+            questions: list[Question] = []
+            for _ in range(parsed_header.qdcount):
+                q, offset = parse_question(buf, offset)
+                questions.append(q)
 
-            # Response
+            # Response: same questions but uncompressed + 1 a for each q
             response_header = Header(
                 id=parsed_header.id,
-                qdcount=1,
-                arcount=1,
+                qdcount=len(questions),
+                ancount=len(questions),
             )
-            response_question = parsed_question
-            response_answer = ResourceRecord(
-                name=parsed_question.name,
-                type=parsed_question.type,
-                class_=parsed_question.class_,
-                ttl=RESPONSE_ANSWER_TTL,
-                rdlength=4,
-                rdata=RESPONSE_ANSWER_RDATA,
-            )
+            response_body = b""
+            for q in questions:
+                response_body += encode_question(q)
+            for q in questions:
+                response_body += encode_record(
+                    ResourceRecord(
+                        name=q.name,
+                        type=q.type,
+                        class_=q.class_,
+                        ttl=RESPONSE_ANSWER_TTL,
+                        rdlength=4,
+                        rdata=RESPONSE_ANSWER_RDATA,
+                    )
+                )
 
-            response = (
-                encode_header(response_header)
-                + encode_question(response_question)
-                + encode_record(response_answer)
-            )
+            response_packet = encode_header(response_header) + response_body
 
-            udp_socket.sendto(response, source)
+            udp_socket.sendto(response_packet, source)
         except Exception as e:
             print(f"Error receiving data: {e}")
             break
