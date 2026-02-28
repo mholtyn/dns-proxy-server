@@ -47,8 +47,8 @@ class Question:
 @dataclass
 class ResourceRecord:
     name: list[str]
-    type: int = 1
-    class_: int = 1
+    type: int
+    class_: int
     ttl: int
     rdlength: int
     rdata: bytes
