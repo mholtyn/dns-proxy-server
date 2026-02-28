@@ -23,6 +23,9 @@ def main(resolver: str = typer.Option(..., "--resolver", help="Resolver ip:port"
     resolver_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     resolver_socket.settimeout(15.0)
 
+    # key is name (labels tuple) + type + class_
+    response_cache: dict[tuple[tuple[str, ...], int, int], list[ResourceRecord]] = {}
+
     while True:
         try:
             buf, source = client_socket.recvfrom(512)
@@ -35,20 +38,26 @@ def main(resolver: str = typer.Option(..., "--resolver", help="Resolver ip:port"
 
             answers: list[ResourceRecord] = []
             for question in questions:
+                cache_key = (tuple(question.name), question.type, question.class_)
+                if cache_key in response_cache:
+                    answers.extend(response_cache[cache_key])
+                    print("cache HIT")
+                    continue
                 # rd=1 bo bez tego publiczny resolver zwraca SERVFAIL
                 # current project assumption: one question for each packet
                 request_packet = encode_header(Header(id=0, qr=0, rd=1, qdcount=1)) + encode_question(question)
                 resolver_socket.sendto(request_packet, resolver_addr)
                 resolver_response_buffer, _ = resolver_socket.recvfrom(512)
                 resolver_response_header, response_offset = parse_header(resolver_response_buffer)
-                
                 # debug resolver response
                 # print("from resolver:", len(resolver_response_buffer), "bytes, ancount:", resolver_response_header.ancount, "qr:", resolver_response_header.qr, "rcode:", resolver_response_header.rcode)
-                
                 _, response_offset = parse_question(resolver_response_buffer, response_offset)
+                current_answer_records: list[ResourceRecord] = []
                 for _ in range(resolver_response_header.ancount):
                     resource_record, response_offset = parse_answer(resolver_response_buffer, response_offset)
-                    answers.append(resource_record)
+                    current_answer_records.append(resource_record)
+                response_cache[cache_key] = current_answer_records
+                answers.extend(current_answer_records)
 
             response_header = Header(
                 id=parsed_header.id,
