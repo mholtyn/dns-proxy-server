@@ -1,6 +1,6 @@
 # Custom DNS Proxy Server
 
-DNS proxy in Python: receives UDP queries, parses request (header + question), supports compressed format, forwards to upstream resolver, parses answer and builds response. Prepared for extending with optional cache.
+DNS proxy in Python: receives UDP queries, parses request (header + question), supports compressed format, forwards to upstream resolver, parses answer and builds response, and stores local cache.
 
 ## Run
 
@@ -19,6 +19,6 @@ dig @127.0.0.1 -p 2053 example.com
 - Parse DNS query (header, question, compressed names)
 - Structured response (dataclasses + encode to wire format)
 - Forward to upstream resolver (`--resolver <ip>:<port>`)
-- Cache: planned
+- Store local cache
 
 Requires Python 3.14+ (see `.python-version`).
